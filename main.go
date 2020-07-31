@@ -54,11 +54,13 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var verboseLogging bool
+	var certDir string
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&verboseLogging, "verbose", false, "Enable verbose logging")
+	flag.StringVar(&certDir, "cert-dir", "", "Certificate directory")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(func(o *zap.Options) {
@@ -72,6 +74,7 @@ func main() {
 		LeaderElectionID:   "logging-operator." + loggingv1beta1.GroupVersion.Group,
 		MapperProvider:     k8sutil.NewCached,
 		Port:               9443,
+		CertDir:            certDir,
 	})
 
 	if err != nil {
@@ -91,6 +94,10 @@ func main() {
 
 	if err := controllers.SetupLoggingWithManager(mgr, ctrl.Log.WithName("manager")).Complete(loggingReconciler); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Logging")
+		os.Exit(1)
+	}
+	if err = (&loggingv1beta1.Flow{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Flow")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
